@@ -12,7 +12,8 @@
     results:$('results'),resultKicker:$('result-kicker'),resultTitle:$('result-title'),resultSummary:$('result-summary'),
     labelPrimary:$('label-primary'),subPrimary:$('sub-primary'),statPrimary:$('stat-primary'),statInvested:$('stat-invested'),statGain:$('stat-gain'),statAfterTax:$('stat-after-tax'),statReal:$('stat-real'),
     chart:$('chart'),tooltip:$('chart-tooltip'),scenarioIntro:$('scenario-intro'),scenarioCards:$('scenario-cards'),yearlyBody:$('yearly-body'),
-    csv:$('export-csv'),pdf:$('export-pdf'),inputHeading:$('input-heading'),inputCopy:$('input-copy')
+    csv:$('export-csv'),pdf:$('export-pdf'),inputHeading:$('input-heading'),inputCopy:$('input-copy'),
+    newsGrid:$('news-grid'),newsStatus:$('news-status'),refreshNews:$('refresh-news'),newsFilters:[...document.querySelectorAll('[data-news-filter]')]
   };
   const monthlyField=els.monthly.closest('.field');
   const lumpField=els.lump.closest('.field');
@@ -192,6 +193,50 @@
     catch{if(!hasMarketData){const message=document.createElement('span');message.className='ticker-message';message.textContent='Market prices are temporarily unavailable — retrying automatically.';els.market.replaceChildren(message);els.market.dataset.ready='false'}}
   }
 
+  let newsStories=[];
+  let activeNewsFilter='all';
+  function relativeTime(dateValue){
+    const timestamp=Date.parse(dateValue||'');
+    if(!Number.isFinite(timestamp))return 'Recent';
+    const minutes=Math.max(0,Math.floor((Date.now()-timestamp)/60000));
+    if(minutes<1)return 'Just now';
+    if(minutes<60)return `${minutes}m ago`;
+    const hours=Math.floor(minutes/60);
+    if(hours<24)return `${hours}h ago`;
+    const days=Math.floor(hours/24);
+    return `${days}d ago`;
+  }
+  function renderNews(){
+    const visible=activeNewsFilter==='all'?newsStories:newsStories.filter(story=>story.category===activeNewsFilter);
+    els.newsGrid.replaceChildren();
+    if(!visible.length){const empty=document.createElement('p');empty.className='news-empty';empty.textContent='No stories are available in this section right now. Try again shortly.';els.newsGrid.appendChild(empty);return}
+    visible.forEach(story=>{
+      const card=document.createElement('article');card.className='news-card';
+      const meta=document.createElement('div');meta.className='news-meta';
+      const category=document.createElement('span');category.className='news-category';category.textContent=story.category==='economy'?'Markets & economy':'World & conflicts';
+      const time=document.createElement('span');time.className='news-time';time.textContent=relativeTime(story.published);meta.append(category,time);
+      const title=document.createElement('h3');title.textContent=story.title;
+      const description=document.createElement('p');description.textContent=story.description||'Open the full story for details.';
+      const link=document.createElement('a');link.href=story.link;link.target='_blank';link.rel='noopener';link.textContent=`Read on ${story.source||'BBC News'} →`;
+      card.append(meta,title,description,link);els.newsGrid.appendChild(card);
+    });
+  }
+  async function loadNews(){
+    els.refreshNews.disabled=true;els.newsStatus.classList.remove('error');els.newsStatus.lastChild.textContent=' Updating latest stories…';
+    try{
+      const response=await fetch('/api/news',{headers:{Accept:'application/json'}});
+      if(!response.ok)throw new Error('News service unavailable');
+      const payload=await response.json();
+      if(!Array.isArray(payload.stories)||!payload.stories.length)throw new Error('No stories returned');
+      newsStories=payload.stories;renderNews();els.newsStatus.lastChild.textContent=` Updated ${relativeTime(payload.updatedAt)}`;
+    }catch{
+      if(!newsStories.length){els.newsGrid.replaceChildren();const empty=document.createElement('p');empty.className='news-empty';empty.textContent='Live news is temporarily unavailable. The calculator and learning guide still work normally.';els.newsGrid.appendChild(empty)}
+      els.newsStatus.classList.add('error');els.newsStatus.lastChild.textContent=' News temporarily unavailable';
+    }finally{els.refreshNews.disabled=false}
+  }
+  els.newsFilters.forEach(button=>button.addEventListener('click',()=>{activeNewsFilter=button.dataset.newsFilter;els.newsFilters.forEach(item=>item.classList.toggle('active',item===button));renderNews()}));
+  els.refreshNews.addEventListener('click',loadNews);
+
   function download(name,content,type){const blob=new Blob([content],{type});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=name;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
   function csvCell(value){const text=String(value);return /[",\n]/.test(text)?`"${text.replace(/"/g,'""')}"`:text}
   function reportRows(model){
@@ -219,4 +264,5 @@
   updateForm();
   document.querySelectorAll('.currency-symbol').forEach(node=>node.textContent=symbols[els.currency.value]);
   loadMarkets();setInterval(loadMarkets,60000);
+  loadNews();setInterval(loadNews,600000);
 })();
