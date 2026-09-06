@@ -102,5 +102,33 @@
     return ((1+finite(nominalPercent)/100)/(1+finite(inflationPercent)/100)-1)*100;
   }
 
-  return {simulate,solveMonthly,cagr,realReturn,afterTaxValue,monthlyRate};
+  function simulateWithdrawal(options){
+    const years=Math.max(1,Math.floor(finite(options.years,1)));
+    const startingBalance=Math.max(0,finite(options.startingBalance));
+    const withdrawalRate=Math.max(0,finite(options.withdrawalRate))/100;
+    const inflation=Math.max(0,finite(options.inflationPercent))/100;
+    const rate=finite(options.annualReturn);
+    const mode=options.mode==='balance-percent'?'balance-percent':'fire';
+    const mr=monthlyRate(rate);
+    const firstAnnualWithdrawal=startingBalance*withdrawalRate;
+    let balance=startingBalance,totalWithdrawn=0;
+    const rows=[];
+    for(let year=1;year<=years;year++){
+      const opening=balance;
+      const annualWithdrawal=mode==='balance-percent'?opening*withdrawalRate:firstAnnualWithdrawal*Math.pow(1+inflation,year-1);
+      const monthlyWithdrawal=annualWithdrawal/12;
+      let actualWithdrawal=0;
+      for(let month=0;month<12;month++){
+        const amount=Math.min(balance,monthlyWithdrawal);
+        balance-=amount;actualWithdrawal+=amount;totalWithdrawn+=amount;
+        balance*=1+mr;
+      }
+      const growth=balance-opening+actualWithdrawal;
+      rows.push({year,opening,withdrawal:actualWithdrawal,totalWithdrawn,growth,value:balance,realValue:balance/Math.pow(1+inflation,year)});
+      if(balance<=0){balance=0;break}
+    }
+    return {years,startingBalance,withdrawalRate:withdrawalRate*100,rate,mode,firstAnnualWithdrawal,totalWithdrawn,value:balance,realValue:balance/Math.pow(1+inflation,rows.length),depleted:balance<=0,depletionYear:balance<=0?rows.length:null,rows};
+  }
+
+  return {simulate,solveMonthly,simulateWithdrawal,cagr,realReturn,afterTaxValue,monthlyRate};
 });
