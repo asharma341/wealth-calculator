@@ -20,6 +20,8 @@
   const stepField=els.step.closest('.field');
   const taxField=els.tax.closest('.field');
   const scenarioSettings=document.querySelector('.scenario-settings');
+  const inputsPanel=document.querySelector('.inputs-panel');
+  const assumptionPanel=document.querySelector('.assumption-panel');
 
   function number(el){return Number(el.value)}
   function compactMoney(value,code=els.currency.value){
@@ -62,6 +64,9 @@
       button.setAttribute(dataKey==='workflow'?'aria-selected':'aria-checked',String(active));
     });
   }
+  function animateTabChange(){
+    [inputsPanel,assumptionPanel].forEach(panel=>{if(!panel)return;panel.classList.remove('tab-refresh');void panel.offsetWidth;panel.classList.add('tab-refresh')});
+  }
   function updateForm(){
     const goal=state.workflow==='goal';
     const withdraw=state.workflow==='withdraw';
@@ -80,8 +85,8 @@
     els.inputCopy.textContent=withdraw?'Choose how much to withdraw and see how long the portfolio may last.':goal?'Enter the future amount and assumptions. We will solve for the starting monthly SIP.':'Choose how you will contribute.';
     els.calculate.textContent=withdraw?'Calculate withdrawals':goal?'Calculate required SIP':'Calculate plan';
   }
-  els.workflow.forEach(button=>button.addEventListener('click',()=>{state.workflow=button.dataset.workflow;selectButtons(els.workflow,state.workflow,'workflow');updateForm()}));
-  els.strategy.forEach(button=>button.addEventListener('click',()=>{state.strategy=button.dataset.strategy;selectButtons(els.strategy,state.strategy,'strategy');updateForm()}));
+  els.workflow.forEach(button=>button.addEventListener('click',()=>{state.workflow=button.dataset.workflow;selectButtons(els.workflow,state.workflow,'workflow');updateForm();animateTabChange()}));
+  els.strategy.forEach(button=>button.addEventListener('click',()=>{state.strategy=button.dataset.strategy;selectButtons(els.strategy,state.strategy,'strategy');updateForm();animateTabChange()}));
 
   document.querySelectorAll('.benchmark').forEach(button=>button.addEventListener('click',()=>{
     els.rate.value=button.dataset.rate;
